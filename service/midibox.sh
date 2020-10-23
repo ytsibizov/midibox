@@ -1,2 +1,2 @@
 #!/bin/sh
-/usr/bin/python3  /home/ubuntu/dev/tinderboxpedal/src.midi/midibox.py
+/usr/bin/python3  /opt/midibox/midibox.py

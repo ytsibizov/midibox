@@ -6,7 +6,7 @@ Wants=network-online.target bluetooth.target
 [Service]
 Restart=always
 Type=simple
-ExecStart=/home/ubuntu/dev/tinderboxpedal/src.midi/midibox.sh
+ExecStart=/opt/midibox/midibox.sh
 Environment=
 
 [Install]
