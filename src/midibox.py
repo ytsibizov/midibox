@@ -91,6 +91,27 @@ class MidiInterface(object):
     def __init__(self):
         self.midiin: rtmidi.MidiIn = None
         self.indev = None
+        self.midiout: rtmidi.MidiOut = None
+        self.outdev = None
+
+    def find_midi_in(self):
+        raise NoMidiDeviceException
+
+    def find_midi_out(self):
+        raise NoMidiDeviceException
+
+    def get_button(self):
+        """ Get a MIDI message, convert to button (0-7), top row (0-3) to select preset
+        """
+        return None
+
+    def set_led(self, led: int, mode: bool):
+        return None
+
+class IconGBoard(MidiInterface):
+    def __init__(self):
+        self.midiin: rtmidi.MidiIn = None
+        self.indev = None
         self.find_midi_in()
         self.midiout: rtmidi.MidiOut = None
         self.outdev = None
@@ -176,6 +197,73 @@ class MidiInterface(object):
         else:
             velocity = 0
         msg = [ NOTE_ON, notes[led], velocity]
+        self.outdev.send_message(msg)
+        return None
+
+
+class BehringerXTouchMini(MidiInterface):
+    def __init__(self):
+        self.midiin: rtmidi.MidiIn = None
+        self.indev = None
+        self.find_midi_in()
+        self.midiout: rtmidi.MidiOut = None
+        self.outdev = None
+        self.find_midi_out()
+
+    def find_midi_in(self):
+        if self.midiin is None:
+            self.midiin = rtmidi.MidiIn()
+        if self.midiin is None:
+            raise NoMidiDeviceException
+        num_ports = self.midiin.get_port_count()
+        for port in range(0, num_ports):
+            if str(self.midiin.get_port_name(port)).startswith('X-TOUCH MINI'):
+                logging.debug('MIDI IN: {0}'.format(self.midiin.get_port_name(port)))
+                self.indev = self.midiin.open_port(port)
+        if self.indev is None:
+            raise NoMidiDeviceException
+
+    def find_midi_out(self):
+        if self.midiout is None:
+            self.midiout = rtmidi.MidiOut()
+        if self.midiout is None:
+            raise NoMidiDeviceException
+        num_ports = self.midiout.get_port_count()
+        for port in range(0, num_ports):
+            if str(self.midiin.get_port_name(port)).startswith('X-TOUCH MINI'):
+                logging.debug('MIDI OUT: {0}'.format(self.midiout.get_port_name(port)))
+                self.outdev = self.midiout.open_port(port)
+        if self.outdev is None:
+            raise NoMidiDeviceException
+
+    def get_button(self):
+        """ Get a MIDI message, convert to button (0-7), top row (0-3) to select preset
+        Top row:
+        """
+        button = None
+        msg = self.indev.get_message()
+        if msg:
+            message, deltatime = msg
+            logging.debug('MIDI IN: %r' % (message))
+            if message[0] == 138  and message[2] == 0:
+                button = message[1] - 8
+                if (button >=0) and (button <=8):
+                    logging.debug('Button {0}'.format(button))
+                    return button
+                if button is not None:
+                    logging.debug('Button {}'.format(button))
+                    return button
+        return None
+
+
+    def set_led(self, led: int, mode: bool):
+        if led not in range(0,8):
+            return None
+        if mode:
+            velocity = 1
+        else:
+            velocity = 0
+        msg = [ NOTE_ON, 0x00 + led, velocity]
         self.outdev.send_message(msg)
         return None
 
@@ -283,8 +371,14 @@ def midibox():
     midi = None
     while midi is None:
         try:
-            midi = MidiInterface()
+            midi = BehringerXTouchMini()
         except NoMidiDeviceException:
+            logging.debug('No Behringer MIDI')
+        try:
+            midi = IconGBoard()
+        except NoMidiDeviceException:
+            logging.debug('No Icon MIDI')
+        if midi is None:
             logging.debug('No MIDI, sleep 10 seconds')
             time.sleep(10)
     logging.debug('Draining MIDI queue....')
